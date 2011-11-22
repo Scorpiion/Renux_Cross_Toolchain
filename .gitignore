@@ -3,5 +3,7 @@
 arm-linux-gnueabi-crossToolChain/ 
 arm-linux-gnueabi-sysroot/  
 src/
-process.txt  
+process.txt
+
+*~
 
