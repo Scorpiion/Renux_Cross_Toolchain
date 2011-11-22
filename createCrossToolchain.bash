@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ************************************************************* #
-# createCrossGcc_4_5_0.bash
+# createCrossToolchain.bash
 # Script to create a cross compilation toolchain based on 
 # GCC 4.5.0, binutils 2.20.1a and eglibc-2-14. Compiled
 # with Linux header from kernel version 2.6.33.3
@@ -29,31 +29,27 @@
 # ************************************************************* #
 # Set variables
 # ************************************************************* #
-export BUILDROOT=$PWD/crossBuild
-export PROCESS_FILE=$BUILDROOT/process.txt
+export src="${PWD}/src"
+export processFile="${PWD}/process.txt"
+export crossSrcPrefix="Renux_cross"
+export buildPackage=""
 export host=$(uname -m)-pc-linux-gnu
 export build=$(uname -m)-pc-linux-gnu
 export target=arm-linux-gnueabi
 export linuxarch=arm
-export sysroot=$BUILDROOT/sysroot
-export prefix=$BUILDROOT/$target-crossToolChain
+export sysroot="${target}-sysroot"
+export prefix="${PWD}/${target}-crossToolChain"
 export JN=$(($(cat /proc/cpuinfo | grep processor | wc -l)*3)) 
 export CFLAGS=" "
 export gccVersionAltered="n"
 export eraseSdcard="y"
-export PKGVERSION="Robert_CrossTools"
+export PKGVERSION="Renux_cross_toolchain"
 # (JN is passed to "-j " for make, $JN is the number of cores
 # times 3)
 
 # ************************************************************* #
-# Makes sure that the user has the right tools 
+# Check Gcc version
 # ************************************************************* #
-sudo apt-get update
-sudo apt-get install build-essential
-sudo apt-get install subversion
-sudo apt-get install gcc-4.5
-sudo apt-get install gperf
-sudo apt-get build-dep gcc-4.5
 
 echo ""
 echo "Checking Gcc version..."
@@ -110,24 +106,19 @@ if [ "$gccVersion" != "4.5" ] ; then
 fi
 
 # ************************************************************* #
-# Make directories
+# Make top level directories
 # ************************************************************* #
-mkdir -p $BUILDROOT
-cd $BUILDROOT
-
+mkdir -p $src
 mkdir -p $sysroot
 mkdir -p $prefix
-mkdir -p binutils
-mkdir -p gcc
-mkdir -p eglibc
 
 # ************************************************************* #
 # Make process file to track process in case an error occured
 # ************************************************************* #
-cd $BUILDROOT
-touch $PROCESS_FILE
-echo "Process file for createCrossGcc_4_5_0.bash created..." > $PROCESS_FILE
-echo "" >> $PROCESS_FILE
+cd $src
+touch $processFile
+echo "Process file for createCrossToolchain.bash created..." > $processFile
+echo "" >> $processFile
 
 # ************************************************************* #
 # Tell the user about the program and process file 
@@ -139,7 +130,7 @@ echo ""
 echo "The script does run continuously until it get is finished"
 echo "(or some error occurs). If you want to follow the process"
 echo "open a new terminal and type the command:"
-echo "clear && tail -f $PROCESS_FILE"
+echo "clear && tail -f $processFile"
 echo ""
 echo "Copy that line before pressing enter if you don't"
 echo "remember it. When ready to start the script please "
@@ -151,77 +142,94 @@ read dummy
 # ************************************************************* #
 # Get source code
 # ************************************************************* #
-echo "Downloading source code" >> $PROCESS_FILE
-cd $BUILDROOT
-echo "  Downloading linux sources" >> $PROCESS_FILE
-wget ftp://ftp.fu-berlin.de/unix/linux/ftp.kernel.org/kernel/v2.6/linux-2.6.33.3.tar.gz
-cd $BUILDROOT/binutils
-echo "  Downloading binutils sources" >> $PROCESS_FILE
-wget ftp://ftp.fu-berlin.de/unix/gnu/binutils/binutils-2.20.1a.tar.bz2
-cd $BUILDROOT/gcc
-echo "  Downloading gcc sources" >> $PROCESS_FILE
-wget ftp://ftp.fu-berlin.de/unix/gnu/gcc/gcc-4.5.0/gcc-4.5.0.tar.gz
-echo "    Downloading gmp sources" >> $PROCESS_FILE
-wget ftp://gcc.gnu.org/pub/gcc/infrastructure/gmp-4.3.2.tar.bz2
-echo "    Downloading mpfr sources" >> $PROCESS_FILE
-wget ftp://gcc.gnu.org/pub/gcc/infrastructure/mpfr-2.4.2.tar.bz2
-echo "    Downloading mpc sources" >> $PROCESS_FILE
-wget ftp://gcc.gnu.org/pub/gcc/infrastructure/mpc-0.8.1.tar.gz
-echo "    Downloading eglibc sources" >> $PROCESS_FILE
-cd $BUILDROOT/eglibc
-svn co http://www.eglibc.org/svn/branches/eglibc-2_14 eglibc-2.14
+cd $src
+echo "Downloading source code" >> $processFile
+
+srcPackages=("binutils" "gcc" "eglibc")
+for buildPackage in "${srcPackages[@]}" ; do
+  if [ ! -d "$src/${crossSrcPrefix}_${buildPackage}" ] ; then
+    echo "Downloading ${buildPackage} sources"
+    echo "  Downloading ${buildPackage} sources" >> $processFile
+    git clone git://github.com/Scorpiion/Renux_cross_${buildPackage}.git
+  else
+    echo "${buildPackage} sources already downloaded, checking for changes"
+    echo "  ${buildPackage} sources already downloaded, checking for changes" >> $processFile
+    git fetch git://github.com/Scorpiion/Renux_cross_${buildPackage}.git
+  fi
+  echo ""
+done
+
+# ************************************************************* #
+# Make build directories
+# ************************************************************* #
+srcPackages=("binutils" "gcc" "eglibc")
+for buildPackage in "${srcPackages[@]}" ; do
+  mkdir -p $src/${crossSrcPrefix}_${buildPackage}/build_${buildPackage}
+done
+
+# ************************************************************* #
+# Check software versions
+# ************************************************************* #
+binutilsVersion=$(cat $src/${crossSrcPrefix}_binutils/version.txt | awk 'NR == 1 {print $1}')
+gccVersion=$(cat $src/${crossSrcPrefix}_gcc/version.txt | awk 'NR == 1 {print $1}')
+gmpVersion=$(cat $src/${crossSrcPrefix}_gcc/version.txt | awk 'NR == 2 {print $1}')
+mpcVersion=$(cat $src/${crossSrcPrefix}_gcc/version.txt | awk 'NR == 3 {print $1}')
+mpfrVersion=$(cat $src/${crossSrcPrefix}_gcc/version.txt | awk 'NR == 4 {print $1}')
+eglibcVersion=$(cat $src/${crossSrcPrefix}_eglibc/version.txt | awk 'NR == 1 {print $1}')
+linuxVersion=$(cat $src/${crossSrcPrefix}_eglibc/version.txt | awk 'NR == 2 {print $1}')
 
 # ************************************************************* #
 # Build binutils
 # ************************************************************* #
-cd $BUILDROOT
-echo "Starting to build binutils" >> $PROCESS_FILE
-cd $BUILDROOT/binutils
-echo "  Unpacking binutils sources" >> $PROCESS_FILE
-tar -jxvf binutils-2.20.1a.tar.bz2 
-mkdir build
-cd build
-echo "  Configuring binutils sources" >> $PROCESS_FILE
-../binutils-2.20.1/configure \
+buildPackage="binutils"
+packageVersion=$binutilsVersion
+
+echo "Starting to build $buildPackage" >> $processFile
+echo "  Configuring $buildPackage sources" >> $processFile
+cd $src/${crossSrcPrefix}_${buildPackage}/build_${buildPackage}
+$src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}/configure \
 --target=$target \
 --prefix=$prefix \
 --with-sysroot=$sysroot \
 --with-pkgversion=$PKGVERSION
-echo "  Compiling binutils" >> $PROCESS_FILE
+echo "  Compiling $buildPackage" >> $processFile
 make -j $JN
 if [ "$?" != "0" ] ; then exit; fi
-echo "  Installing binutils" >> $PROCESS_FILE
+echo "  Installing $buildPackage" >> $processFile
 make -j $JN install
 if [ "$?" != "0" ] ; then exit; fi
 
 # ************************************************************* #
-# Unpack packages needed by GCC into GCC folder
+# Create symbollinks for gcc libraries
 # ************************************************************* #
-echo "  Unpacking gcc sources" >> $PROCESS_FILE
-cd $BUILDROOT/gcc
-tar -zxvf gcc-4.5.0.tar.gz
-echo "Unpack packages needed by GCC" >> $PROCESS_FILE
-cd $BUILDROOT/gcc/gcc-4.5.0
-echo "  Unpacking gmp sources" >> $PROCESS_FILE
-tar -jxvf ../gmp-4.3.2.tar.bz2
-echo "  Unpacking mpfr sources" >> $PROCESS_FILE
-tar -jxvf ../mpfr-2.4.2.tar.bz2
-echo "  Unpacking mpc sources" >> $PROCESS_FILE
-tar -zxvf ../mpc-0.8.1.tar.gz
-echo "    Create symbollinks for packages" >> $PROCESS_FILE
-ln -s gmp-4.3.2 gmp
-ln -s mpfr-2.4.2 mpfr
-ln -s mpc-0.8.1 mpc
+buildPackage="gcc"
+
+echo "  Create symbollinks for gcc libraries" >> $processFile
+cd $src/${crossSrcPrefix}_${buildPackage}/build_${buildPackage}
+ln -s ../gmp-${gmpVersion} gmp
+ln -s ../mpc-${mpcVersion} mpc
+ln -s ../mpfr-${mpfrVersion} mpfr
 
 # ************************************************************* #
 # Build GCC stage 1
 # ************************************************************* #
-echo "Starting to build GCC stage 1" >> $PROCESS_FILE
-cd $BUILDROOT/gcc
-mkdir build
-cd build
-echo "  Configuring gcc (stage 1) sources" >> $PROCESS_FILE
-../gcc-4.5.0/configure \
+buildPackage="gcc"
+packageVersion=$gccVersion
+
+echo "Starting to build GCC stage 1" >> $processFile
+echo "  Configuring gcc (stage 1) sources" >> $processFile
+
+echo "debug.."
+echo "debug.."
+echo "debug.."
+
+cd $src/${crossSrcPrefix}_${buildPackage}/build_${buildPackage}
+
+echo "debug.."
+echo "debug.."
+echo "debug.."
+
+$src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}/configure \
 --target=$target \
 --prefix=$prefix \
 --without-headers \
@@ -235,40 +243,43 @@ echo "  Configuring gcc (stage 1) sources" >> $PROCESS_FILE
 --with-pkgversion=$PKGVERSION
 if [ "$?" != "0" ] ; then exit; fi
 
-echo "  Compiling gcc (stage 1)" >> $PROCESS_FILE
+echo "  Compiling $buildPackage (stage 1)" >> $processFile
 PATH=$prefix/bin:$PATH make -j $JN all-gcc
 if [ "$?" != "0" ] ; then exit; fi
-echo "  Installing gcc (stage 1)" >> $PROCESS_FILE
+echo "  Installing $buildPackage (stage 1)" >> $processFile
 PATH=$prefix/bin:$PATH make -j $JN install-gcc
 if [ "$?" != "0" ] ; then exit; fi
 
 # ************************************************************* #
 # Install header files (Linux and eglibc, needed for stage 2)
 # ************************************************************* #
-echo "Starting to install Linux headers" >> $PROCESS_FILE
-cd $BUILDROOT
-echo "  Unpacking Linux sources" >> $PROCESS_FILE
-tar -zxvf linux-2.6.33.3.tar.gz
-cd linux-2.6.33.3
+buildPackage="linux"
+packageVersion=$linuxVersion
+
+echo "Starting to install Linux headers" >> $processFile
+cd $src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}
 mkdir -p $sysroot/usr
 PATH=$prefix/bin:$PATH \
 make headers_install CROSS_COMPILE=$target- \
 INSTALL_HDR_PATH=$sysroot/usr ARCH=$linuxarch
 if [ "$?" != "0" ] ; then exit; fi
 
-echo "Starting to install Eglibc headers" >> $PROCESS_FILE
-cd $BUILDROOT
-cd eglibc
+buildPackage="eglibc"
+packageVersion=$eglibcVersion
+
+echo "Starting to install Eglibc headers" >> $processFile
+cd $src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}
 cp -r eglibc-2.14/ports eglibc-2.14/libc
-mkdir build
-cd build
+
 # Configure headers
-echo "  Configuring eglibc sources (headers only)" >> $PROCESS_FILE
+echo "  Configuring eglibc sources (headers only)" >> $processFile
+cd $src/${crossSrcPrefix}_${buildPackage}/build_${buildPackage}
+
 BUILD_CC=gcc
 CC=$prefix/bin/$target-gcc \
 AR=$prefix/bin/$target-ar \
 RANLIB=$prefix/bin/$target-ranlib \
-../eglibc-2.14/libc/configure \
+$src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}/configure \
 --prefix=/usr \
 --with-headers=$sysroot/usr/include \
 --build=$build \
@@ -280,13 +291,13 @@ RANLIB=$prefix/bin/$target-ranlib \
 --with-pkgversion=$PKGVERSION
 if [ "$?" != "0" ] ; then exit; fi
 
-echo "  Installing eglibc headers" >> $PROCESS_FILE
+echo "  Installing eglibc headers" >> $processFile
 make -j $JN install-headers \
 install_root=$sysroot \
 install-bootstrap-headers=yes
 if [ "$?" != "0" ] ; then exit; fi
 
-echo "Fixing some header installation by hand" >> $PROCESS_FILE
+echo "Fixing some header installation by hand" >> $processFile
 # Fix some stuff by hand
 mkdir -p $sysroot/usr/lib
 make -j $JN csu/subdir_lib
@@ -301,12 +312,14 @@ $prefix/bin/$target-gcc -nostdlib -nostartfiles -shared -x c /dev/null -o $sysro
 # eglibc headers and selected objects files and now installed,
 # now we can build GCC stage 2
 # ************************************************************* #
-echo "Starting to build GCC stage 2" >> $PROCESS_FILE
-cd $BUILDROOT
-cd gcc/build
+buildPackage="gcc"
+packageVersion=$gccVersion
+
+echo "Starting to build GCC stage 2" >> $processFile
+cd $src/${crossSrcPrefix}_${buildPackage}/build_${buildPackage}
 rm -rf *
-echo "  Configuring gcc (stage 2) sources" >> $PROCESS_FILE
-../gcc-4.5.0/configure \
+echo "  Configuring gcc (stage 2) sources" >> $processFile
+$src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}/configure \
 --target=$target \
 --prefix=$prefix \
 --with-sysroot=$sysroot \
@@ -317,26 +330,28 @@ echo "  Configuring gcc (stage 2) sources" >> $PROCESS_FILE
 --with-pkgversion=$PKGVERSION
 if [ "$?" != "0" ] ; then exit; fi
 
-echo "  Compiling gcc (stage 2)" >> $PROCESS_FILE
+echo "  Compiling $buildPackage (stage 2)" >> $processFile
 PATH=$prefix/bin:$PATH make -j $JN 
 if [ "$?" != "0" ] ; then exit; fi
-echo "  Installing gcc (stage 2)" >> $PROCESS_FILE
+echo "  Installing $buildPackage (stage 2)" >> $processFile
 PATH=$prefix/bin:$PATH make -j $JN install
 if [ "$?" != "0" ] ; then exit; fi
 
 # ************************************************************* #
 # Build complete Eglibc with the new stage 2 GCC compiler
 # ************************************************************* #
-echo "Starting to complete eglibc" >> $PROCESS_FILE
-cd $BUILDROOT
-cd eglibc/build
+buildPackage="eglibc"
+packageVersion=$eglibcVersion
+
+echo "Starting to complete eglibc" >> $processFile
+cd $src/${crossSrcPrefix}_${buildPackage}/build_${buildPackage}
 rm -rf *
-echo "  Configuring eglibc sources (complete)" >> $PROCESS_FILE
+echo "  Configuring eglibc sources (complete)" >> $processFile
 BUILD_CC=gcc \
 CC=$prefix/bin/$target-gcc \
 AR=$prefix/bin/$target-ar \
 RANLIB=$prefix/bin/$target-ranlib \
-../eglibc-2.14/libc/configure \
+$src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}/libc/configure \
 --prefix=/usr \
 --with-headers=$sysroot/usr/include \
 --build=$build \
@@ -348,10 +363,10 @@ RANLIB=$prefix/bin/$target-ranlib \
 --with-pkgversion=$PKGVERSION
 if [ "$?" != "0" ] ; then exit; fi
 
-echo "  Compiling eglibc (complete)" >> $PROCESS_FILE
+echo "  Compiling $buildPackage (complete)" >> $processFile
 PATH=$prefix/bin:$PATH make -j $JN
 if [ "$?" != "0" ] ; then exit; fi
-echo "  Installing eglibc (complete)" >> $PROCESS_FILE
+echo "  Installing $buildPackage (complete)" >> $processFile
 PATH=$prefix/bin:$PATH make -j $JN install install_root=$sysroot
 if [ "$?" != "0" ] ; then exit; fi
 
@@ -361,11 +376,14 @@ if [ "$?" != "0" ] ; then exit; fi
 # a c library so that it could generate it's own libraries like
 # libgcc etc.
 # ************************************************************* #
-echo "Starting to build GCC stage 3" >> $PROCESS_FILE
-cd $BUILDROOT
-cd gcc/build
+buildPackage="gcc"
+packageVersion=$gccVersion
+
+echo "Starting to build GCC stage 3" >> $processFile
+cd $src/${crossSrcPrefix}_${buildPackage}/build_${buildPackage}
 rm -rf *
-../gcc-4.5.0/configure \
+echo "  Configuring gcc (stage 3) sources" >> $processFile
+$src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}/configure \
 --target=$target \
 --prefix=$prefix \
 --with-sysroot=$sysroot \
@@ -376,10 +394,10 @@ rm -rf *
 --with-pkgversion=$PKGVERSION
 if [ "$?" != "0" ] ; then exit; fi
 
-echo "  Compiling gcc (stage 3)" >> $PROCESS_FILE
+echo "  Compiling $buildPackage (stage 3)" >> $processFile
 PATH=$prefix/bin:$PATH make -j $JN 
 if [ "$?" != "0" ] ; then exit; fi
-echo "  Installing gcc (stage 3)" >> $PROCESS_FILE
+echo "  Installing $buildPackage (stage 3)" >> $processFile
 PATH=$prefix/bin:$PATH make -j $JN install
 if [ "$?" != "0" ] ; then exit; fi
 
@@ -387,7 +405,7 @@ if [ "$?" != "0" ] ; then exit; fi
 # Complete the sysroot with some additional libraries not added
 # by GCC (since GCC is not build to construct sysroot's)
 # ************************************************************* #
-echo "Completing the sysroot by installing some by hand" >> $PROCESS_FILE
+echo "Completing the sysroot by installing some by hand" >> $processFile
 cp -d $prefix/$target/lib/libgcc_s.so* $sysroot/lib
 cp -d $prefix/$target/lib/libstdc++.so $sysroot/usr/lib
 
@@ -398,8 +416,8 @@ cp -d $prefix/$target/lib/libstdc++.so $sysroot/usr/lib
 # Creating a test c file, and compiling it with the new compiler,
 # checking the ARCH and ABI with the help of the command readelf
 # ************************************************************* #
-echo "Creating a test.c file" >> $PROCESS_FILE
-cd $BUILDROOT
+echo "Creating a test.c file" >> $processFile
+cd $src
 
 cat > test.c << "EOF"
 #include <stdio.h>
@@ -413,11 +431,11 @@ int main () {
 }
 EOF
 
-echo "Compiling test.c with new compiler" >> $PROCESS_FILE
+echo "Compiling test.c with new compiler" >> $processFile
 $prefix/bin/$target-gcc -o test test.c
 if [ "$?" != "0" ] ; then exit; fi
 
-echo "Checking the newly created executeble with readelf" >> $PROCESS_FILE
+echo "Checking the newly created executeble with readelf" >> $processFile
 readelf -h test
 if [ "$?" != "0" ] ; then exit; fi
 
@@ -432,7 +450,7 @@ echo "  ..."
 echo ""
 echo "Then the cross compiler seams to work!"
 echo ""
-echo "Otherwise, check the file \"$PROCESS_FILE\" to see how far the script came"
+echo "Otherwise, check the file \"$processFile\" to see how far the script came"
 echo "before it failed and try to debug from there."
 
 echo ""
@@ -446,6 +464,6 @@ if [ "$gccVersionAltered" != "y" ] ; then
   echo "sudo mv /usr/bin/gcc.old /usr/bin/gcc"
 fi
 
-echo ""  >> $PROCESS_FILE
+echo ""  >> $processFile
 echo ""
-echo "Program done, please the main window if the build was successfull" >> $PROCESS_FILE
+echo "Program done, please the main window if the build was successfull" >> $processFile
