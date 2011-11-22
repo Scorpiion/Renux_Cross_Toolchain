@@ -1,0 +1,12 @@
+Renux cross toolchain is a cross toolchain targeting the ARM architecture and have been tested and used on the Texas Instruments OMAP3 platforms.
+
+This script can be run from any Linux based desktop by a Debian/Ubuntu based distribution is recommended since the setup script can install required by packagse. If you have different distro you may have to install some packages you self, but it should not be a big problem.
+
+The script downloads, configures and compiles all source code for you. The basic idea is that you start the script, wait, and then have you toolchain ready. 
+
+No other source code or script other than those in this project is needed, the script downloads gcc and other source code components from these git reporosetories and then does all the work:
+https://github.com/Scorpiion/Renux_cross_binutils
+https://github.com/Scorpiion/Renux_cross_gcc
+https://github.com/Scorpiion/Renux_cross_eglibc
+
+
