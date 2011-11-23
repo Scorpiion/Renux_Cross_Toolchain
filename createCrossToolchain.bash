@@ -434,7 +434,7 @@ echo "  Checking if machine type is ARM..." >> $processFile
 checkMachine=$(readelf -h test |  awk 'NR==9 {print $2}')
 if [ "$checkMachine" == "ARM" ] 
 then 
-  echo "    Success machine type is ARM"'!' >> $processFile
+  echo "    Success, machine type of outputfile is ARM"'!' >> $processFile
   echo ""
   echo "Success, the compiler could compile the output file and it's format is ARM"'!'
 else 
