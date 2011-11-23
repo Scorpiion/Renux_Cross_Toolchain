@@ -37,7 +37,7 @@ export host=$(uname -m)-pc-linux-gnu
 export build=$(uname -m)-pc-linux-gnu
 export target=arm-linux-gnueabi
 export linuxarch=arm
-export sysroot="${target}-sysroot"
+export sysroot="${PWD}/${target}-sysroot"
 export prefix="${PWD}/${target}-crossToolChain"
 export JN=$(($(cat /proc/cpuinfo | grep processor | wc -l)*3)) 
 export CFLAGS=" "
@@ -135,7 +135,6 @@ echo ""
 echo "Copy that line before pressing enter if you don't"
 echo "remember it. When ready to start the script please "
 echo "press enter."
-echo ""
 
 read dummy
 
@@ -203,9 +202,10 @@ if [ "$?" != "0" ] ; then exit; fi
 # Create symbollinks for gcc libraries
 # ************************************************************* #
 buildPackage="gcc"
+packageVersion=$gccVersion
 
 echo "  Create symbollinks for gcc libraries" >> $processFile
-cd $src/${crossSrcPrefix}_${buildPackage}/build_${buildPackage}
+cd $src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}
 ln -s ../gmp-${gmpVersion} gmp
 ln -s ../mpc-${mpcVersion} mpc
 ln -s ../mpfr-${mpfrVersion} mpfr
@@ -217,18 +217,9 @@ buildPackage="gcc"
 packageVersion=$gccVersion
 
 echo "Starting to build GCC stage 1" >> $processFile
-echo "  Configuring gcc (stage 1) sources" >> $processFile
-
-echo "debug.."
-echo "debug.."
-echo "debug.."
-
 cd $src/${crossSrcPrefix}_${buildPackage}/build_${buildPackage}
-
-echo "debug.."
-echo "debug.."
-echo "debug.."
-
+rm -rf *
+echo "  Configuring gcc (stage 1) sources" >> $processFile
 $src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}/configure \
 --target=$target \
 --prefix=$prefix \
@@ -257,7 +248,7 @@ buildPackage="linux"
 packageVersion=$linuxVersion
 
 echo "Starting to install Linux headers" >> $processFile
-cd $src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}
+cd $src/${crossSrcPrefix}_eglibc/${buildPackage}-${packageVersion}
 mkdir -p $sysroot/usr
 PATH=$prefix/bin:$PATH \
 make headers_install CROSS_COMPILE=$target- \
@@ -269,7 +260,7 @@ packageVersion=$eglibcVersion
 
 echo "Starting to install Eglibc headers" >> $processFile
 cd $src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}
-cp -r eglibc-2.14/ports eglibc-2.14/libc
+cp -r ports libc
 
 # Configure headers
 echo "  Configuring eglibc sources (headers only)" >> $processFile
@@ -279,7 +270,7 @@ BUILD_CC=gcc
 CC=$prefix/bin/$target-gcc \
 AR=$prefix/bin/$target-ar \
 RANLIB=$prefix/bin/$target-ranlib \
-$src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}/configure \
+$src/${crossSrcPrefix}_${buildPackage}/${buildPackage}-${packageVersion}/libc/configure \
 --prefix=/usr \
 --with-headers=$sysroot/usr/include \
 --build=$build \
@@ -436,28 +427,23 @@ $prefix/bin/$target-gcc -o test test.c
 if [ "$?" != "0" ] ; then exit; fi
 
 echo "Checking the newly created executeble with readelf" >> $processFile
-readelf -h test
+readelf -h test |  awk 'NR==1 || NR ==3 || (NR>3 && NR<10) || NR==14'
 if [ "$?" != "0" ] ; then exit; fi
 
-echo ""
-echo "createCrossGcc_4_5_0.bash is now done."
-echo "If the output above says:"
-echo "  ..."
-echo "  Machine:                           ARM"
-echo "  ..."
-echo "  Flags:                             0x5000002, has entry point, Version5 EABI"
-echo "  ..."
-echo ""
-echo "Then the cross compiler seams to work!"
-echo ""
-echo "Otherwise, check the file \"$processFile\" to see how far the script came"
-echo "before it failed and try to debug from there."
+echo "  Checking if machine type is ARM..." >> $processFile
+checkMachine=$(readelf -h test |  awk 'NR==9 {print $2}')
+if [ "$checkMachine" == "ARM" ] 
+then 
+  echo "    Success machine type is ARM"'!' >> $processFile
+  echo ""
+  echo "Success, the compiler could compile the output file and it's format is ARM"'!'
+else 
+  echo "    Error, machine type does not seam to be \"ARM\", check the output of \"readelf -h test\" for more info" >> $processFile
+  echo ""
+  echo "Error, machine type does not seam to be \"ARM\", check the output of \"readelf -h test\" for more info"
+fi
 
-echo ""
-echo "Moving toolchain out of build directory..."
-mv $prefix ..
-
-if [ "$gccVersionAltered" != "y" ] ; then 
+if [ "$gccVersionAltered" == "y" ] ; then 
   echo ""
   echo "Your default Gcc version was changed by this script, if you want to set"
   echo "the gcc version back, execute this command:"
