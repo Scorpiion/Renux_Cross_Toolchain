@@ -1,7 +1,7 @@
 # Files that git should ignore...
 
-arm-linux-gnueabi-crossToolChain/ 
-arm-linux-gnueabi-sysroot/  
+arm-linux-gnueabi-crossToolChain/
+arm-linux-gnueabi-sysroot/
 src/
 process.txt
 
