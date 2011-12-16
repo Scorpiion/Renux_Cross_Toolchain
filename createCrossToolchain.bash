@@ -153,7 +153,7 @@ for buildPackage in "${srcPackages[@]}" ; do
   else
     echo "${buildPackage} sources already downloaded, checking for changes"
     echo "  ${buildPackage} sources already downloaded, checking for changes" >> $processFile
-    git fetch git://github.com/Scorpiion/Renux_cross_${buildPackage}.git
+    git pull git://github.com/Scorpiion/Renux_cross_${buildPackage}.git
   fi
   echo ""
 done
