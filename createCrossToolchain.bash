@@ -43,6 +43,7 @@ export JN=$(($(cat /proc/cpuinfo | grep processor | wc -l)*3))
 export CFLAGS=" "
 export gccVersionAltered="n"
 export eraseSdcard="y"
+export installToolchain="n"
 export PKGVERSION="Renux_cross_toolchain"
 # (JN is passed to "-j " for make, $JN is the number of cores
 # times 3)
@@ -449,6 +450,28 @@ else
   echo "Error, machine type does not seam to be \"ARM\", check the output of \"readelf -h test\" for more info"
 fi
 
+# ************************************************************* #
+# Install toolchain
+# ************************************************************* #
+if [ "$installToolchain" == "n" ]; then
+  echo -n "Do you want to install the script to install the toolchain? (y/n) "
+  read installToolchain
+  echo ""
+fi
+
+if [ "$installToolchain" == "y" ]; then
+  sudo cp -r arm-linux-gnueabi-crossToolChain /opt/
+  pushd . &> /dev/null
+  cd /opt/arm-linux-gnueabi-crossToolChain/bin
+  for file in * ; do
+    sudo ln -s $PWD/$file /usr/bin/$file
+  done
+  popd &> /dev/null
+fi
+
+# ************************************************************* #
+# Finish up script
+# ************************************************************* #
 if [ "$gccVersionAltered" == "y" ] ; then 
   echo ""
   echo "Your default Gcc version was changed by this script, if you want to set"
@@ -459,3 +482,4 @@ fi
 echo ""  >> $processFile
 echo ""
 echo "Program done, please the main window if the build was successfull" >> $processFile
+
