@@ -56,19 +56,25 @@ echo "Checking Gcc version..."
 echo ""
 gccVersion=$(gcc -v 2>&1 | tail -1 | awk '{print $3}' | cut -c 1-3)
 if [ "$gccVersion" != "4.5" ] ; then 
-  echo "Gcc 4.5 is not default Gcc... Checking if Gcc-4.5 is installed"
-  echo ""
+  echo "Gcc 4.5 is not default Gcc... Checking if Gcc-4.5 is installed..."
   ls /usr/bin | grep gcc-4.5
   
   if [ "$?" != "0" ] ; then 
+    echo "Gcc 4.5 is not installed!"
     echo ""
-    echo "Gcc 4.5 is not installed and the script failed to install it."
-    echo "This is probably because you don't have Gcc 4.5 in your repos."
+    echo "Try and install it with:"
+    echo "sudo apt-get install gcc-4.5"
     echo ""
-    echo "You can try and search with: "
-    echo "sudo apt-cache search gcc | grep gcc-4.5"
+    echo "If that does not work, try this: (copy this text somewhere, during the "
+    echo "install of gcc a lot of text will be printed to the screen, answer yes if asked"
+    echo "to restart services)"
+    echo "sudo sed -i 's/lucid/oneiric/g' /etc/apt/sources.list &> /dev/null"
+    echo "sudo apt-get update &> /dev/null"
+    echo "sudo apt-get install gcc-4.5"
+    echo "sudo sed -i 's/oneiric/lucid/g' /etc/apt/sources.list &> /dev/null"
+    echo "sudo apt-get update &> /dev/null"
     echo ""
-    echo "If you can't find gcc-4.5 try and search here:"
+    echo "If you still can't install gcc-4.5 try and search for the package here:"
     echo "http://packages.ubuntu.com/"
     echo ""
     echo "Good luck..."
@@ -83,7 +89,7 @@ if [ "$gccVersion" != "4.5" ] ; then
   echo "sudo mv /usr/bin/gcc /usr/bin/gcc.old"
   echo "sudo ln -s /usr/bin/gcc-4.5 /usr/bin/gcc"
   echo ""
-  echo -n "Do you want the script change Gcc 4.5 to the default version (running the command above)? (y/n): "
+  echo -n "Do you want this script to try and change the default Gcc version to 4.5 (running the command above)? (y/n): "
   read trySetupGcc
   if [ "$trySetupGcc" == "n" ]; then
     echo "Okey, good bye"
